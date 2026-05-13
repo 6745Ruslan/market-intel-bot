@@ -77,7 +77,7 @@ async def trend(update: Update, context: ContextTypes.DEFAULT_TYPE):
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
-        max_tokens=1000,
+        max_tokens=500,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": f"{build_context(history)}\n\nПокажи тренды цен за все недели."}]
     )
@@ -93,7 +93,7 @@ async def forecast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
-        max_tokens=1000,
+        max_tokens=500,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": f"{build_context(history)}\n\nДай прогноз на следующую неделю и торговый сигнал."}]
     )
@@ -129,7 +129,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pdf_b64 = base64.b64encode(bytes(file_bytes)).decode()
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
-        max_tokens=1000,
+        max_tokens=500,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": [
             {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": pdf_b64}},
@@ -172,7 +172,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
-        max_tokens=1000,
+        max_tokens=500,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": f"{build_context(history)}\n\nВопрос: {text}"}]
     )
