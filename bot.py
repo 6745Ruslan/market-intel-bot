@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 HISTORY_FILE = "market_history.json"
-MODEL = "claude-3-haiku-20240307"
+MODEL = "claude-haiku-4-5-20251001"
 
 SYSTEM_PROMPT = """Ты — аналитик нефтехимического рынка СНГ.
 Анализируешь цены на ПП, ПЭ, газовый конденсат.
