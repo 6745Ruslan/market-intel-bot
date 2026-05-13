@@ -16,6 +16,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 HISTORY_FILE = "market_history.json"
+MODEL = "claude-3-haiku-20240307"
 
 SYSTEM_PROMPT = """Ты — аналитик нефтехимического рынка СНГ.
 Анализируешь цены на ПП, ПЭ, газовый конденсат.
@@ -77,7 +78,7 @@ async def trend(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
         response = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model=MODEL,
             max_tokens=500,
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": f"{build_context(history)}\n\nКратко покажи тренды цен. Максимум 10 строк."}]
@@ -96,7 +97,7 @@ async def forecast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
         response = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model=MODEL,
             max_tokens=500,
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": f"{build_context(history)}\n\nКраткий прогноз и сигнал. Максимум 8 строк."}]
@@ -135,7 +136,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
         pdf_b64 = base64.b64encode(bytes(file_bytes)).decode()
         response = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model=MODEL,
             max_tokens=500,
             system="Ты аналитик рынка СНГ. Отвечай кратко на русском.",
             messages=[{"role": "user", "content": [
@@ -169,7 +170,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
         response = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model=MODEL,
             max_tokens=500,
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": f"{build_context(history)}\n\nВопрос: {text}"}]
