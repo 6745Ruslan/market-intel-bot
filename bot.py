@@ -77,10 +77,10 @@ async def trend(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-3-5-sonnet-20241022",
             max_tokens=500,
             system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": f"{build_context(history)}\n\nКратко покажи тренды цен за все недели. Максимум 10 строк."}]
+            messages=[{"role": "user", "content": f"{build_context(history)}\n\nКратко покажи тренды цен. Максимум 10 строк."}]
         )
         await update.message.reply_text("📈 ТРЕНДЫ\n\n" + response.content[0].text)
     except Exception as e:
@@ -96,10 +96,10 @@ async def forecast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-3-5-sonnet-20241022",
             max_tokens=500,
             system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": f"{build_context(history)}\n\nКраткий прогноз на следующую неделю и сигнал. Максимум 8 строк."}]
+            messages=[{"role": "user", "content": f"{build_context(history)}\n\nКраткий прогноз и сигнал. Максимум 8 строк."}]
         )
         await update.message.reply_text("🔮 ПРОГНОЗ\n\n" + response.content[0].text)
     except Exception as e:
@@ -135,12 +135,12 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
         pdf_b64 = base64.b64encode(bytes(file_bytes)).decode()
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-3-5-sonnet-20241022",
             max_tokens=500,
             system="Ты аналитик рынка СНГ. Отвечай кратко на русском.",
             messages=[{"role": "user", "content": [
                 {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": pdf_b64}},
-                {"type": "text", "text": "Кратко (максимум 15 строк):\n1) Дата и источник\n2) Топ-5 цен с изменениями за неделю\n3) Главное событие\n4) Тренд\n5) Сигнал: купить/держать/ждать"}
+                {"type": "text", "text": "Кратко (максимум 15 строк):\n1) Дата и источник\n2) Топ-5 цен с изменениями\n3) Главное событие\n4) Тренд\n5) Сигнал: купить/держать/ждать"}
             ]}]
         )
         analysis = response.content[0].text
@@ -169,7 +169,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-3-5-sonnet-20241022",
             max_tokens=500,
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": f"{build_context(history)}\n\nВопрос: {text}"}]
