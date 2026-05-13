@@ -5,8 +5,11 @@ import anthropic
 import base64
 from telegram import Update
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler,
-    filters, ContextTypes
+    Application,
+    CommandHandler,
+    MessageHandler,
+    filters,
+    ContextTypes,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -15,19 +18,9 @@ logger = logging.getLogger(__name__)
 HISTORY_FILE = "market_history.json"
 
 SYSTEM_PROMPT = """Ты — персональный аналитик нефтехимического рынка СНГ.
-У тебя есть доступ к истории еженедельных отчётов пользователя.
-Ты анализируешь цены на полипропилен (ПП), полиэтилен (ПЭ),
-газовый конденсат и другие продукты.
-
-При анализе отчёта извлекай:
-- Все цены с изменениями за неделю
-- Ключевые события рынка
-- Тренды по продуктам
-- Прогноз на следующую неделю
-- Торговый сигнал (купить/держать/ждать)
-
-Отвечай на русском языке. Будь конкретным, используй цифры.
-Помни контекст всей истории загруженных отчётов."""
+Анализируешь цены на ПП, ПЭ, газовый конденсат и другие продукты.
+При анализе извлекай: цены с изменениями, события, тренды, прогноз, сигнал.
+Отвечай на русском. Будь конкретным, используй цифры."""
 
 
 def load_history():
@@ -44,80 +37,67 @@ def save_history(history):
 
 def build_context(history):
     if not history["reports"]:
-        return "История отчётов пуста. Это первый отчёт."
-    context = f"ИСТОРИЯ ОТЧЁТОВ ({len(history['reports'])} недель):\n\n"
-    for i, report in enumerate(history["reports"][-8:], 1):
-        context += f"Отчёт {i} ({report.get('date', '?')}):\n"
-        context += report.get("summary", "") + "\n\n"
+        return "История пуста. Это первый отчёт."
+    ctx = f"ИСТОРИЯ ({len(history['reports'])} недель):\n\n"
+    for i, r in enumerate(history["reports"][-8:], 1):
+        ctx += f"Отчёт {i} ({r.get('date','?')}):\n{r.get('summary','')}\n\n"
     if history["user_notes"]:
-        context += "\nЗАМЕТКИ ПОЛЬЗОВАТЕЛЯ:\n"
-        for note in history["user_notes"]:
-            context += f"• {note}\n"
-    return context
+        ctx += "ЗАМЕТКИ:\n" + "\n".join(f"• {n}" for n in history["user_notes"])
+    return ctx
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     history = load_history()
-    count = len(history["reports"])
-    text = f"""👋 Привет! Я ваш персональный аналитик рынка.
-
-📊 В памяти: {count} отчётов
-
-Что я умею:
-• Анализировать PDF отчёты
-• Отслеживать тренды цен по неделям
-• Давать прогнозы и торговые сигналы
-• Отвечать на любые вопросы о рынке
-
-Просто пришлите PDF отчёт или задайте вопрос! 🚀"""
-    await update.message.reply_text(text)
+    await update.message.reply_text(
+        f"👋 Привет! Я аналитик рынка.\n\n"
+        f"📊 В памяти: {len(history['reports'])} отчётов\n\n"
+        f"Пришлите PDF отчёт или задайте вопрос!\n\n"
+        f"Команды:\n/summary — последний отчёт\n"
+        f"/trend — тренды\n/forecast — прогноз\n"
+        f"/history — история\n/clear — очистить"
+    )
 
 
 async def summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
     history = load_history()
     if not history["reports"]:
-        await update.message.reply_text("📭 Отчётов пока нет. Пришлите PDF!")
+        await update.message.reply_text("📭 Отчётов нет. Пришлите PDF!")
         return
     last = history["reports"][-1]
-    await update.message.reply_text(
-        f"📊 Последний отчёт ({last.get('date', '')}):\n\n{last.get('summary', 'Нет данных')}"
-    )
+    text = f"📊 Последний отчёт ({last.get('date','')}):\n\n{last.get('summary','')}"
+    await update.message.reply_text(text[:4000])
 
 
 async def trend(update: Update, context: ContextTypes.DEFAULT_TYPE):
     history = load_history()
     if len(history["reports"]) < 2:
-        await update.message.reply_text(
-            f"📈 Нужно минимум 2 отчёта.\nСейчас: {len(history['reports'])}"
-        )
+        await update.message.reply_text("Нужно минимум 2 отчёта.")
         return
-    await update.message.reply_text("⏳ Анализирую тренды...")
+    await update.message.reply_text("⏳ Анализирую...")
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-    ctx = build_context(history)
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=1000,
         system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": f"{ctx}\n\nПокажи тренды цен за все недели. По каждому продукту: изменение в % и направление."}]
+        messages=[{"role": "user", "content": f"{build_context(history)}\n\nПокажи тренды цен за все недели."}]
     )
-    await update.message.reply_text("📈 ТРЕНДЫ\n\n" + response.content[0].text)
+    await update.message.reply_text("📈 ТРЕНДЫ\n\n" + response.content[0].text[:3500])
 
 
 async def forecast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     history = load_history()
     if not history["reports"]:
-        await update.message.reply_text("📭 Отчётов пока нет. Пришлите PDF!")
+        await update.message.reply_text("📭 Отчётов нет. Пришлите PDF!")
         return
     await update.message.reply_text("⏳ Готовлю прогноз...")
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-    ctx = build_context(history)
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=1000,
         system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": f"{ctx}\n\nДай прогноз на следующую неделю и торговый сигнал."}]
+        messages=[{"role": "user", "content": f"{build_context(history)}\n\nДай прогноз на следующую неделю и торговый сигнал."}]
     )
-    await update.message.reply_text("🔮 ПРОГНОЗ\n\n" + response.content[0].text)
+    await update.message.reply_text("🔮 ПРОГНОЗ\n\n" + response.content[0].text[:3500])
 
 
 async def history_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -126,8 +106,8 @@ async def history_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📭 История пуста.")
         return
     text = f"📅 ИСТОРИЯ ({len(history['reports'])} отчётов)\n\n"
-    for i, report in enumerate(history["reports"], 1):
-        text += f"{i}. {report.get('date', '?')} — {report.get('source', 'отчёт')}\n"
+    for i, r in enumerate(history["reports"], 1):
+        text += f"{i}. {r.get('date','?')} — {r.get('source','отчёт')}\n"
     await update.message.reply_text(text)
 
 
@@ -145,32 +125,25 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     file = await context.bot.get_file(doc.file_id)
     file_bytes = await file.download_as_bytearray()
     history = load_history()
-    ctx = build_context(history)
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-    pdf_base64 = base64.b64encode(bytes(file_bytes)).decode("utf-8")
+    pdf_b64 = base64.b64encode(bytes(file_bytes)).decode()
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=1000,
         system=SYSTEM_PROMPT,
-        messages=[{
-            "role": "user",
-            "content": [
-                {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": pdf_base64}},
-                {"type": "text", "text": f"КОНТЕКСТ:\n{ctx}\n\nПроанализируй отчёт: цены, события, тренд, прогноз, торговый сигнал."}
-            ]
-        }]
+        messages=[{"role": "user", "content": [
+            {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": pdf_b64}},
+            {"type": "text", "text": f"КОНТЕКСТ:\n{build_context(history)}\n\nПроанализируй отчёт: цены, события, тренд, прогноз, сигнал."}
+        ]}]
     )
     analysis = response.content[0].text
     meta = client.messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=100,
-        messages=[{
-            "role": "user",
-            "content": [
-                {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": pdf_base64}},
-                {"type": "text", "text": "Только дата и источник: ДАТА: дд.мм.гггг | ИСТОЧНИК: название"}
-            ]
-        }]
+        messages=[{"role": "user", "content": [
+            {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": pdf_b64}},
+            {"type": "text", "text": "Только: ДАТА: дд.мм.гггг | ИСТОЧНИК: название"}
+        ]}]
     ).content[0].text
     date, source = "?", doc.file_name
     if "ДАТА:" in meta:
@@ -181,37 +154,34 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     history["reports"].append({"date": date, "source": source, "filename": doc.file_name, "summary": analysis})
     save_history(history)
     num = len(history["reports"])
-    full = f"✅ Отчёт #{num} сохранён\n📅 {date} · {source}\n🧠 В памяти: {num} отчётов\n\n{analysis}"
-    if len(full) > 4000:
-        await update.message.reply_text(full[:4000])
-        await update.message.reply_text(full[4000:8000])
-    else:
-        await update.message.reply_text(full)
+    reply = f"✅ Отчёт #{num} сохранён\n📅 {date} · {source}\n🧠 В памяти: {num}\n\n{analysis}"
+    await update.message.reply_text(reply[:4000])
+    if len(reply) > 4000:
+        await update.message.reply_text(reply[4000:8000])
 
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_text = update.message.text
+    text = update.message.text
     history = load_history()
-    if any(kw in user_text.lower() for kw in ["запомни", "запомнить", "отметь", "сохрани"]):
-        history["user_notes"].append(user_text)
+    if any(k in text.lower() for k in ["запомни", "запомнить", "отметь", "сохрани"]):
+        history["user_notes"].append(text)
         save_history(history)
-        await update.message.reply_text(f"✅ Запомнил!\n\n«{user_text}»")
+        await update.message.reply_text(f"✅ Запомнил!\n«{text}»")
         return
     await update.message.reply_text("💭 Думаю...")
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-    ctx = build_context(history)
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=1000,
         system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": f"{ctx}\n\nВопрос: {user_text}"}]
+        messages=[{"role": "user", "content": f"{build_context(history)}\n\nВопрос: {text}"}]
     )
-    await update.message.reply_text(response.content[0].text)
+    await update.message.reply_text(response.content[0].text[:4000])
 
 
 def main():
     token = os.environ["TELEGRAM_TOKEN"]
-    app = ApplicationBuilder().token(token).build()
+    app = Application.builder().token(token).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("summary", summary))
     app.add_handler(CommandHandler("trend", trend))
